@@ -16,8 +16,24 @@ PART_OUTLINE_EQUALS_PATTERN = re.compile(
     re.MULTILINE | re.DOTALL,
 )
 
+# Numbered outline start: "1. title..." (may wrap onto later lines).
+PART_OUTLINE_START_PATTERN = re.compile(r"(?m)^([1-3])\.\s*(.*)$")
+
+# Verse refs like "(13절)", "(14-15절)", or wrapped "(16-17\n절)".
+PART_OUTLINE_VERSE_PATTERN = re.compile(
+    r"\(\s*(\d+(?:\s*[-~]\s*\d+)?\s*절?)\s*\)",
+    re.DOTALL,
+)
+
 # Backward-compatible alias used by older imports/tests.
 PART_OUTLINE_PATTERN = PART_OUTLINE_PAREN_PATTERN
+
+OUTLINE_STOP_MARKERS = (
+    "관찰",
+    "본문",
+    "적용적해석",
+    "대제",
+)
 
 BODY_QUOTE_PATTERN = re.compile(
     r"(?<!\d)"
@@ -52,6 +68,71 @@ def _normalize_outline_desc(desc: str) -> str:
     return re.sub(r"\s+", " ", desc.replace("\n", " ")).strip()
 
 
+def _normalize_outline_title(title: str) -> str:
+    return re.sub(r"\s+", "", title).strip()
+
+
+def _normalize_outline_verse_ref(verse_ref: str) -> str:
+    cleaned = re.sub(r"\s+", "", verse_ref.strip())
+    if cleaned and not cleaned.endswith("절") and cleaned[-1].isdigit():
+        cleaned = f"{cleaned}절"
+    return cleaned
+
+
+def _extract_outline_description(after_verse: str) -> str:
+    """Extract description after a verse ref: '(desc)' or '= desc'."""
+    paren_match = re.match(r"\s*\((.+?)\)", after_verse, re.DOTALL)
+    if paren_match:
+        return paren_match.group(1)
+
+    # Truncated PDF text may omit the closing parenthesis.
+    open_paren = re.match(r"\s*\((.+)", after_verse, re.DOTALL)
+    if open_paren:
+        return open_paren.group(1).split("\n", 1)[0]
+
+    equals_match = re.match(r"\s*=\s*(.+)", after_verse, re.DOTALL)
+    if equals_match:
+        return equals_match.group(1).split("\n", 1)[0]
+
+    return ""
+
+
+def _parse_outline_blocks(text: str) -> dict[int, tuple[str, str, str]]:
+    """Parse outline parts even when titles/verse refs wrap across lines."""
+    starts = list(PART_OUTLINE_START_PATTERN.finditer(text))
+    parts: dict[int, tuple[str, str, str]] = {}
+
+    for index, match in enumerate(starts):
+        part_index = int(match.group(1))
+        if part_index not in (1, 2, 3) or part_index in parts:
+            continue
+
+        if index + 1 < len(starts):
+            block_end = starts[index + 1].start()
+        else:
+            block_end = len(text)
+            remainder = text[match.end() :]
+            for marker in OUTLINE_STOP_MARKERS:
+                stop = re.search(rf"\n\s*{re.escape(marker)}", remainder)
+                if stop:
+                    block_end = min(block_end, match.end() + stop.start())
+
+        block = text[match.start(2) : block_end]
+        verse_match = PART_OUTLINE_VERSE_PATTERN.search(block)
+        if not verse_match:
+            continue
+
+        title = _normalize_outline_title(block[: verse_match.start()])
+        verse_ref = _normalize_outline_verse_ref(verse_match.group(1))
+        desc = _normalize_outline_desc(_extract_outline_description(block[verse_match.end() :]))
+        if not title or not verse_ref:
+            continue
+
+        parts[part_index] = (title, verse_ref, desc)
+
+    return parts
+
+
 def parse_sermon_outline(text: str) -> list[tuple[int, str, str, str]]:
     """Return sermon outline parts as (index, title, verse_ref, description)."""
     parts: dict[int, tuple[str, str, str]] = {}
@@ -59,16 +140,24 @@ def parse_sermon_outline(text: str) -> list[tuple[int, str, str, str]]:
     for index_text, title, verse_ref, desc in PART_OUTLINE_PAREN_PATTERN.findall(text):
         part_index = int(index_text)
         if part_index in (1, 2, 3):
-            parts[part_index] = (title.strip(), verse_ref.strip(), _normalize_outline_desc(desc))
+            parts[part_index] = (
+                _normalize_outline_title(title),
+                _normalize_outline_verse_ref(verse_ref),
+                _normalize_outline_desc(desc),
+            )
 
     for match in PART_OUTLINE_EQUALS_PATTERN.finditer(text):
         part_index = int(match.group("index"))
         if part_index in (1, 2, 3) and part_index not in parts:
             parts[part_index] = (
-                match.group("title").strip(),
-                match.group("verse").strip(),
+                _normalize_outline_title(match.group("title")),
+                _normalize_outline_verse_ref(match.group("verse")),
                 _normalize_outline_desc(match.group("desc")),
             )
+
+    for part_index, payload in _parse_outline_blocks(text).items():
+        if part_index not in parts:
+            parts[part_index] = payload
 
     return [(index, *parts[index]) for index in sorted(parts) if index in parts]
 

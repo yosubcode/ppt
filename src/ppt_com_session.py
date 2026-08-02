@@ -8,6 +8,9 @@ from typing import Any, Generator
 
 from ppt_com_text import save_presentation_with_embedded_fonts
 
+# PowerPoint PpEntryEffect.ppEffectNone
+PP_EFFECT_NONE = 0
+
 
 def _create_powerpoint_app():
     import win32com.client
@@ -27,6 +30,16 @@ def _open_presentation(powerpoint, presentation_path: str | Path):
         Untitled=False,
         WithWindow=False,
     )
+
+
+def clear_all_slide_transitions(presentation) -> int:
+    """Set every slide transition effect to None. Returns slide count updated."""
+    updated = 0
+    for slide_index in range(1, presentation.Slides.Count + 1):
+        transition = presentation.Slides(slide_index).SlideShowTransition
+        transition.EntryEffect = PP_EFFECT_NONE
+        updated += 1
+    return updated
 
 
 @contextmanager
@@ -52,6 +65,8 @@ def needs_powerpoint_session(
     background_path: Path | None,
 ) -> bool:
     """Return True when at least one COM editing step will run."""
+    if getattr(opts, "clear_slide_transitions", True):
+        return True
     if background_path:
         return True
     if not str(data.get("sermon_title2", "")).strip():

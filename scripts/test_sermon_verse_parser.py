@@ -55,6 +55,19 @@ EQUALS_OUTLINE_TEXT = """
 20~21절= "하나님은이르시되어리석은자여오늘밤에네영혼을도로찾으리니그러면네준비한것이누구의것이되겠느냐"
 """
 
+WRAPPED_OUTLINE_TEXT = """
+제목 : 나는 어느 편에 서 있는가?
+성경 : 계2:12-17
+대제 :
+1.핍박속에서도믿음을지키는편에서십시오
+(13절) (믿음을저버리지않음)
+2. 세상과타협하는발람의교훈을거절하십시
+오(14-15절)(세속적유익과편리를따름=우상숭배)
+3. 회개하여주님의편에서십시오축복(16-17
+절) (감췄던만나=말씀회복, 새이름주심)
+적용적해석 (대제 의 자료)
+"""
+
 
 class SermonVerseParserTests(unittest.TestCase):
     def test_parse_three_parts(self) -> None:
@@ -88,6 +101,25 @@ class SermonVerseParserTests(unittest.TestCase):
         self.assertEqual(parts[3]["verse_start"], 20)
         self.assertEqual(parts[3]["verse_end"], 21)
         self.assertIn("리석은자", parts[3]["verse_ko_quote"])
+
+    def test_parse_wrapped_outline_format(self) -> None:
+        outline = parse_sermon_outline(WRAPPED_OUTLINE_TEXT)
+        self.assertEqual(len(outline), 3)
+
+        self.assertEqual(outline[0][1], "핍박속에서도믿음을지키는편에서십시오")
+        self.assertEqual(outline[0][2], "13절")
+        self.assertIn("믿음을저버리지않음", outline[0][3])
+
+        self.assertEqual(
+            outline[1][1],
+            "세상과타협하는발람의교훈을거절하십시오",
+        )
+        self.assertEqual(outline[1][2], "14-15절")
+        self.assertIn("세속적유익", outline[1][3])
+
+        self.assertEqual(outline[2][1], "회개하여주님의편에서십시오축복")
+        self.assertEqual(outline[2][2], "16-17절")
+        self.assertIn("감췄던만나", outline[2][3])
 
     def test_align_truncated_quote(self) -> None:
         ko_full = (

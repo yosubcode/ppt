@@ -25,7 +25,11 @@ from app_paths import (
     get_template_path,
     get_thumbnail_template_path,
 )
-from ppt_com_session import needs_powerpoint_session, powerpoint_edit_session
+from ppt_com_session import (
+    clear_all_slide_transitions,
+    needs_powerpoint_session,
+    powerpoint_edit_session,
+)
 from thumbnail_builder import generate_thumbnail_ppt
 
 ROOT = get_app_root()
@@ -74,6 +78,7 @@ class GenerateOptions:
     generate_thumbnail: bool = True
     hymns_dir: Path = DEFAULT_HYMNS_DIR
     hymn_background_image: Path | None = None
+    clear_slide_transitions: bool = True
     save_json: Path | None = None
     on_progress: Callable[[str], None] | None = None
 
@@ -332,6 +337,11 @@ def generate_week_ppt(
                         f"{hymn_stats.get('hymn1_file')} ({hymn_stats.get('hymn1')} slides), "
                         f"{hymn_stats.get('hymn2_file')} ({hymn_stats.get('hymn2')} slides)",
                     )
+
+            if opts.clear_slide_transitions:
+                _report_progress(opts, "슬라이드 전환 효과 제거 중...")
+                cleared = clear_all_slide_transitions(presentation)
+                _report_progress(opts, f"슬라이드 전환 효과 제거 완료 ({cleared} slides)")
 
             _report_progress(opts, "PowerPoint 저장 중...")
     else:
