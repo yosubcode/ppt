@@ -45,7 +45,7 @@ def _load_json_payload(path_str: str) -> dict[str, Any]:
 
 
 def load_responsive_ko_lines(number: int) -> list[str]:
-    """Return Korean lines for a reading from bible/responsive_ko.json."""
+    """Return Korean lines from bible/responsive_reading/responsive_ko.json."""
     ko_path = get_responsive_ko_path()
     if ko_path is None:
         return []
@@ -54,7 +54,7 @@ def load_responsive_ko_lines(number: int) -> list[str]:
 
 
 def load_responsive_en_lines(number: int) -> list[str]:
-    """Return English lines for a reading from bible/responsive_en.json."""
+    """Return English lines from bible/responsive_reading/responsive_en.json."""
     en_path = get_responsive_en_path()
     if en_path is None:
         return []

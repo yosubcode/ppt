@@ -15,6 +15,7 @@ config/*.log
 output/*
 !output/.gitkeep
 bible/responsive_translate_log.txt
+bible/responsive_reading/_en_audit.txt
 bible/scrape_log.txt
 bible/scrape_failures.json
 bible/full_audit_report.txt

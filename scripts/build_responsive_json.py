@@ -1,6 +1,6 @@
-"""Rebuild bible/responsive_en.json from bible/responsive_ko.json.
+"""Rebuild bible/responsive_reading/responsive_en.json from responsive_ko.json.
 
-Korean source of truth is bible/responsive_ko.json.
+Korean source of truth is bible/responsive_reading/responsive_ko.json.
 English is translated once and stored locally so PPT generation does not re-translate.
 
 Format:
@@ -25,9 +25,9 @@ from translator import (
     translate_responsive_lines_esv,
 )
 
-KO_PATH = ROOT / "bible" / "responsive_ko.json"
-EN_PATH = ROOT / "bible" / "responsive_en.json"
-LOG_PATH = ROOT / "bible" / "responsive_translate_log.txt"
+KO_PATH = ROOT / "bible" / "responsive_reading" / "responsive_ko.json"
+EN_PATH = ROOT / "bible" / "responsive_reading" / "responsive_en.json"
+LOG_PATH = ROOT / "bible" / "responsive_reading" / "responsive_translate_log.txt"
 
 READING_GAP_SECONDS = 0.4
 

@@ -94,13 +94,19 @@ def ensure_app_dirs() -> None:
         if bundled_gae.exists():
             shutil.copy2(bundled_gae, local_gae)
 
+    responsive_dir = root / "bible" / "responsive_reading"
+    responsive_dir.mkdir(parents=True, exist_ok=True)
     for name in ("responsive_ko.json", "responsive_en.json"):
-        local_path = root / "bible" / name
+        local_path = responsive_dir / name
         if local_path.exists():
             continue
-        bundled_path = get_bundle_root() / "bible" / name
-        if bundled_path.exists():
-            shutil.copy2(bundled_path, local_path)
+        for bundled_path in (
+            get_bundle_root() / "bible" / "responsive_reading" / name,
+            get_bundle_root() / "bible" / name,
+        ):
+            if bundled_path.exists():
+                shutil.copy2(bundled_path, local_path)
+                break
 
 
 def get_gae_verses_path() -> Path | None:
@@ -130,12 +136,27 @@ def _resolve_bible_json(filename: str) -> Path | None:
     return None
 
 
+def _resolve_responsive_json(filename: str) -> Path | None:
+    """Resolve responsive reading JSON under bible/responsive_reading/."""
+    candidates = (
+        get_app_root() / "bible" / "responsive_reading" / filename,
+        get_bundle_root() / "bible" / "responsive_reading" / filename,
+        # Legacy flat bible/ location.
+        get_app_root() / "bible" / filename,
+        get_bundle_root() / "bible" / filename,
+    )
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
+
+
 def get_responsive_ko_path() -> Path | None:
-    return _resolve_bible_json("responsive_ko.json")
+    return _resolve_responsive_json("responsive_ko.json")
 
 
 def get_responsive_en_path() -> Path | None:
-    return _resolve_bible_json("responsive_en.json")
+    return _resolve_responsive_json("responsive_en.json")
 
 
 def get_input_hyms_dir() -> Path:

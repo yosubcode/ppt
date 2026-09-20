@@ -11,8 +11,8 @@ datas = [
     (str(ROOT / "templates" / "Sunday_Template.pptx"), "templates"),
     (str(ROOT / "templates" / "Thumbnail_Template.pptx"), "templates"),
     (str(ROOT / "bible" / "gae_verses.json"), "bible"),
-    (str(ROOT / "bible" / "responsive_ko.json"), "bible"),
-    (str(ROOT / "bible" / "responsive_en.json"), "bible"),
+    (str(ROOT / "bible" / "responsive_reading" / "responsive_ko.json"), "bible/responsive_reading"),
+    (str(ROOT / "bible" / "responsive_reading" / "responsive_en.json"), "bible/responsive_reading"),
 ]
 binaries = []
 hiddenimports = [
