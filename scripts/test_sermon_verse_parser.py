@@ -68,6 +68,19 @@ WRAPPED_OUTLINE_TEXT = """
 적용적해석 (대제 의 자료)
 """
 
+COMBINED_PAREN_OUTLINE_TEXT = """
+제목 : 하나님 말씀을 저버린 다음 세대
+성경 : 삿2:1-10
+1. 여호와의사자가책망함(1-5절)
+(2절= 다음세대의비극)
+2. 신앙체험의상실(6-7절=신세대의위험성)
+3. 다음세대에대한영적책임(10절)
+관찰
+2~3절=“너희는이땅의주민과언약을맺지말며”
+6~7절=“전에여호수아가백성을보내매”
+10절=“그세대의사람도다그조상들에게로돌아갔고”
+"""
+
 
 class SermonVerseParserTests(unittest.TestCase):
     def test_parse_three_parts(self) -> None:
@@ -120,6 +133,30 @@ class SermonVerseParserTests(unittest.TestCase):
         self.assertEqual(outline[2][1], "회개하여주님의편에서십시오축복")
         self.assertEqual(outline[2][2], "16-17절")
         self.assertIn("감췄던만나", outline[2][3])
+
+    def test_parse_combined_paren_outline_format(self) -> None:
+        """Verse and description may share one paren: '(6-7절=desc)'."""
+        outline = parse_sermon_outline(COMBINED_PAREN_OUTLINE_TEXT)
+        self.assertEqual(len(outline), 3)
+
+        self.assertEqual(outline[0][1], "여호와의사자가책망함")
+        self.assertEqual(outline[0][2], "1-5절")
+
+        self.assertEqual(outline[1][1], "신앙체험의상실")
+        self.assertEqual(outline[1][2], "6-7절")
+        self.assertIn("신세대의위험성", outline[1][3])
+
+        self.assertEqual(outline[2][1], "다음세대에대한영적책임")
+        self.assertEqual(outline[2][2], "10절")
+        self.assertEqual(outline[2][3], "")
+
+        parts = parse_sermon_part_verses(COMBINED_PAREN_OUTLINE_TEXT)
+        self.assertEqual(sorted(parts), [1, 2, 3])
+        self.assertEqual(parts[2]["verse_start"], 6)
+        self.assertEqual(parts[2]["verse_end"], 7)
+        self.assertIn("여호수아", parts[2]["verse_ko_quote"])
+        self.assertEqual(parts[3]["verse_start"], 10)
+        self.assertIn("그세대", parts[3]["verse_ko_quote"])
 
     def test_align_truncated_quote(self) -> None:
         ko_full = (

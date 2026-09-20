@@ -2,15 +2,26 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
-from typing import Any
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from typing import Any, Callable
 
-from deep_translator import GoogleTranslator
+from deep_translator import GoogleTranslator, MyMemoryTranslator
 
 from korean_text import strip_english_verse_reference
 
 HANGUL_PATTERN = re.compile(r"[\uAC00-\uD7A3]")
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+GOOGLE_GTX_URL = "https://translate.googleapis.com/translate_a/single"
+GOOGLE_TRANSLATE_RETRIES = 4
+GOOGLE_RETRY_BASE_SECONDS = 1.0
+GOOGLE_RATE_LIMIT_SECONDS = 3.0
+RESPONSIVE_LINE_GAP_SECONDS = 0.35
 
 # Korean source field -> English target field
 SIMPLE_TRANSLATION_PAIRS: list[tuple[str, str]] = [
@@ -93,17 +104,102 @@ def _translate_with_openai(text: str, api_key: str, *, system_prompt: str | None
     return response.output_text.strip()
 
 
+def _translate_with_google_gtx(text: str) -> str:
+    """Translate via Google's public gtx JSON endpoint (more stable than HTML scrape)."""
+    query = urllib.parse.urlencode(
+        {
+            "client": "gtx",
+            "sl": "ko",
+            "tl": "en",
+            "dt": "t",
+            "q": text,
+        }
+    )
+    request = urllib.request.Request(
+        f"{GOOGLE_GTX_URL}?{query}",
+        headers={"User-Agent": USER_AGENT},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        raise RuntimeError(f"Google gtx HTTP {error.code}") from error
+    except urllib.error.URLError as error:
+        raise RuntimeError(f"Google gtx network error: {error.reason}") from error
+
+    chunks = payload[0] if isinstance(payload, list) and payload else []
+    translated = "".join(
+        str(part[0])
+        for part in chunks
+        if isinstance(part, list) and part and part[0]
+    ).strip()
+    if not translated:
+        raise RuntimeError("Google gtx returned empty translation")
+    return translated
+
+
+def _translate_with_google_scrape(text: str) -> str:
+    """Fallback to deep_translator HTML scrape."""
+    translated = GoogleTranslator(source="ko", target="en").translate(text)
+    if translated is None or not str(translated).strip():
+        raise RuntimeError("Google scrape returned empty translation")
+    return str(translated).strip()
+
+
+def _translate_with_mymemory(text: str) -> str:
+    """Fallback free translator when Google rate-limits."""
+    translated = MyMemoryTranslator(source="ko-KR", target="en-GB").translate(text)
+    if translated is None or not str(translated).strip():
+        raise RuntimeError("MyMemory returned empty translation")
+    return str(translated).strip()
+
+
+def _is_rate_limited(error: Exception) -> bool:
+    name = type(error).__name__.lower()
+    message = str(error).lower()
+    return (
+        "429" in message
+        or "too many" in message
+        or "ratelimit" in name
+        or "toomanyrequests" in name
+    )
+
+
+def _translate_with_google(text: str) -> str:
+    """Translate with retries across Google/MyMemory. Raises if all attempts fail."""
+    backends: tuple[Callable[[str], str], ...] = (
+        _translate_with_google_gtx,
+        _translate_with_google_scrape,
+        _translate_with_mymemory,
+    )
+    last_error: Exception | None = None
+
+    for attempt in range(GOOGLE_TRANSLATE_RETRIES):
+        for backend in backends:
+            try:
+                return backend(text)
+            except Exception as error:
+                last_error = error
+                if _is_rate_limited(error):
+                    time.sleep(GOOGLE_RATE_LIMIT_SECONDS * (attempt + 1))
+        time.sleep(GOOGLE_RETRY_BASE_SECONDS * (attempt + 1))
+
+    raise RuntimeError(
+        f"Translation failed after {GOOGLE_TRANSLATE_RETRIES} retries: {last_error}"
+    ) from last_error
+
+
 def translate_ko_to_en(text: str) -> str:
     """Translate Korean text to English."""
     cleaned = text.strip()
     if not cleaned:
         return ""
 
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if api_key:
         translated = _translate_with_openai(cleaned, api_key)
     else:
-        translated = GoogleTranslator(source="ko", target="en").translate(cleaned)
+        translated = _translate_with_google(cleaned)
 
     return capitalize_english_text(translated)
 
@@ -114,7 +210,7 @@ def translate_responsive_lines_esv(lines: list[str]) -> list[str]:
     if not cleaned_lines:
         return []
 
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if api_key:
         numbered = "\n".join(f"{index + 1}. {line}" for index, line in enumerate(cleaned_lines))
         translated_block = _translate_with_openai(
@@ -130,12 +226,11 @@ def translate_responsive_lines_esv(lines: list[str]) -> list[str]:
         return _parse_numbered_translation_block(translated_block, len(cleaned_lines))
 
     translated_lines: list[str] = []
-    for line in cleaned_lines:
-        translated_lines.append(
-            capitalize_english_text(
-                GoogleTranslator(source="ko", target="en").translate(line)
-            )
-        )
+    for index, line in enumerate(cleaned_lines):
+        if index:
+            # Gap reduces Google 429 failures on long responsive readings.
+            time.sleep(RESPONSIVE_LINE_GAP_SECONDS)
+        translated_lines.append(capitalize_english_text(_translate_with_google(line)))
     return translated_lines
 
 

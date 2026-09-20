@@ -11,6 +11,7 @@ import urllib.request
 from typing import Any
 
 from bible_books import (
+    BOOKS,
     format_scripture_reference_en,
     format_scripture_reference_ko_full,
     resolve_bible_book,
@@ -20,12 +21,24 @@ from sermon_verse_parser import build_sermon_part_ko_en, format_part_verse_ref_e
 
 USER_AGENT = "Mozilla/5.0 (WorshipPPT/1.0)"
 BSKOREA_URL = "https://www.bskorea.or.kr/bible/korbibReadpage.php"
+HOLYBIBLE_GAE_URL = "http://www.holybible.or.kr/B_GAE/cgi/bibleftxt.php"
 BIBLE_API_URL = "https://bible-api.com"
 ESV_API_URL = "https://api.esv.org/v3/passage/text/"
 
+# Protestant canon order (1-66) used by holybible.or.kr VL parameter.
+_BSKOREA_TO_VL: dict[str, int] = {
+    book.bskorea_code: index for index, book in enumerate(BOOKS, start=1)
+}
+
 VERSE_NUMBER_PATTERN = re.compile(
-    r'<span class="number"[^>]*>(?:<a[^>]*></a>)?(\d+)&nbsp;.*?</span>(.*?)</span>',
+    r'<span class="number"[^>]*>(?:<a[^>]*></a>)?'
+    r"(\d+(?:\s*[-~]\s*\d+)?)&nbsp;.*?</span>(.*?)</span>",
     re.DOTALL,
+)
+_OL_START_PATTERN = re.compile(r"<ol\s+start=(\d+)[^>]*>", re.IGNORECASE)
+_LI_VERSE_PATTERN = re.compile(
+    r"<li>\s*<font\s+class=tk4l>(.*?)</font>",
+    re.IGNORECASE | re.DOTALL,
 )
 
 
@@ -55,11 +68,16 @@ def enrich_scripture_data(data: dict[str, Any], *, fetch: bool = True) -> dict[s
     if not parsed or not book or not reference_en:
         return updated
 
+    ko_map: dict[int, str] = {}
+    en_map: dict[int, str] = {}
     try:
         ko_map = fetch_korean_verses(book.bskorea_code, parsed)
+    except Exception:
+        ko_map = {}
+    try:
         en_map = fetch_english_verses(reference_en, parsed)
     except Exception:
-        return updated
+        en_map = {}
 
     if ko_map:
         updated["scripture_ko_text"] = _join_verse_map(ko_map, include_numbers=False)
@@ -103,9 +121,17 @@ def enrich_sermon_part_verses(data: dict[str, Any], *, fetch: bool = True) -> di
         ko_text = ""
         en_text = ""
         if fetch and book:
+            ko_map: dict[int, str] = {}
+            en_map: dict[int, str] = {}
             try:
                 ko_map = fetch_korean_verses(book.bskorea_code, verse_range)
+            except Exception:
+                ko_map = {}
+            try:
                 en_map = fetch_english_verses(ref_en, verse_range)
+            except Exception:
+                en_map = {}
+            try:
                 if pdf_ko:
                     ko_text, en_text = build_sermon_part_ko_en(
                         pdf_ko,
@@ -132,30 +158,196 @@ def enrich_sermon_part_verses(data: dict[str, Any], *, fetch: bool = True) -> di
 
 
 def fetch_korean_verses(book_code: str, scripture_range: ScriptureRange) -> dict[int, str]:
-    """Fetch 개역개정 verses from bskorea.or.kr."""
+    """Fetch 개역개정 verses, trying multiple sources until one succeeds.
+
+    Source order:
+      1) local bible/gae_verses.json (Korean book keys) when present
+      2) bskorea.or.kr
+      3) holybible.or.kr VR=GAE
+      4) holybible.or.kr VR=9 (개역개정 alias)
+
+    Returns {verse_num: plain text} in the same shape used by PPT/GUI.
+    """
+    errors: list[str] = []
+    fetchers = (
+        ("local-json", _fetch_korean_local_json),
+        ("bskorea", _fetch_korean_bskorea),
+        ("holybible-GAE", _fetch_korean_holybible),
+        ("holybible-VR9", lambda code, rng: _fetch_korean_holybible(code, rng, vr="9")),
+    )
+    for source_name, fetcher in fetchers:
+        try:
+            verses = fetcher(book_code, scripture_range)
+            return _require_complete_verses(verses, scripture_range, source_name)
+        except Exception as error:
+            errors.append(f"{source_name}: {error}")
+
+    raise ValueError("All Korean scripture sources failed: " + " | ".join(errors))
+
+
+def _require_complete_verses(
+    verses: dict[int, str],
+    scripture_range: ScriptureRange,
+    source_name: str,
+) -> dict[int, str]:
+    cleaned = {
+        verse_num: text.strip()
+        for verse_num, text in verses.items()
+        if text and str(text).strip()
+    }
+    missing = [num for num in scripture_range.verse_numbers() if num not in cleaned]
+    if missing:
+        raise ValueError(f"{source_name} missing verses: {missing}")
+    return {num: cleaned[num] for num in scripture_range.verse_numbers()}
+
+
+def _parse_verse_number_token(token: str) -> list[int]:
+    """Expand '18' or combined '18-19' markers used by bskorea HTML."""
+    cleaned = re.sub(r"\s+", "", token.strip())
+    for separator in ("-", "~"):
+        if separator in cleaned:
+            start_text, end_text = cleaned.split(separator, 1)
+            start = int(start_text)
+            end = int(end_text)
+            if end < start:
+                start, end = end, start
+            return list(range(start, end + 1))
+    return [int(cleaned)]
+
+
+def _fetch_korean_bskorea(book_code: str, scripture_range: ScriptureRange) -> dict[int, str]:
+    """Fetch 개역개정 verses from bskorea.or.kr HTML."""
     url = (
         f"{BSKOREA_URL}?version=GAE&book={book_code}"
         f"&chap={scripture_range.chapter}"
         f"&sec={scripture_range.start}&sec2={scripture_range.end}"
     )
     html = _http_get(url)
+    if "Connection refused" in html:
+        raise RuntimeError("bskorea include connection refused")
+
     section_match = re.search(r'id="tdBible1"(.*)', html, flags=re.DOTALL | re.IGNORECASE)
     section = section_match.group(1) if section_match else html
 
     verses: dict[int, str] = {}
     for match in VERSE_NUMBER_PATTERN.finditer(section):
-        verse_num = int(match.group(1))
-        if verse_num < scripture_range.start or verse_num > scripture_range.end:
-            continue
         text = _clean_html_text(match.group(2))
-        if text:
+        if not text:
+            continue
+        for verse_num in _parse_verse_number_token(match.group(1)):
+            if verse_num < scripture_range.start or verse_num > scripture_range.end:
+                continue
             verses[verse_num] = text
-
-    if len(verses) != scripture_range.count:
-        missing = [num for num in scripture_range.verse_numbers() if num not in verses]
-        if missing:
-            raise ValueError(f"Missing Korean verses: {missing}")
     return verses
+
+
+def _fetch_korean_holybible(
+    book_code: str,
+    scripture_range: ScriptureRange,
+    *,
+    vr: str = "GAE",
+) -> dict[int, str]:
+    """Fetch 개역개정 verses from holybible.or.kr chapter HTML."""
+    vl = _BSKOREA_TO_VL.get(book_code)
+    if vl is None:
+        raise ValueError(f"Unknown book code: {book_code}")
+
+    url = (
+        f"{HOLYBIBLE_GAE_URL}?VR={urllib.parse.quote(str(vr))}&VL={vl}"
+        f"&CN={scripture_range.chapter}&CV=99"
+    )
+    html = _http_get(url)
+    if "Connection refused" in html:
+        raise RuntimeError("holybible include connection refused")
+
+    chapter_verses = _parse_holybible_gae_verses(html)
+    if not chapter_verses:
+        raise RuntimeError("holybible returned no parseable verses")
+
+    return {
+        verse_num: chapter_verses[verse_num]
+        for verse_num in scripture_range.verse_numbers()
+        if verse_num in chapter_verses
+    }
+
+
+_LOCAL_GAE_CACHE: dict[str, Any] | None = None
+
+
+def _load_local_gae_payload() -> dict[str, Any]:
+    """Load and cache bible/gae_verses.json."""
+    global _LOCAL_GAE_CACHE
+    if _LOCAL_GAE_CACHE is not None:
+        return _LOCAL_GAE_CACHE
+
+    from app_paths import get_gae_verses_path
+
+    path = get_gae_verses_path()
+    if path is None:
+        raise FileNotFoundError("Local GAE file not found under bible/ (or bundled copy)")
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Local GAE file has invalid root type: {path}")
+    _LOCAL_GAE_CACHE = payload
+    return payload
+
+
+def _fetch_korean_local_json(
+    book_code: str,
+    scripture_range: ScriptureRange,
+) -> dict[int, str]:
+    """Primary offline source: bible/gae_verses.json with Korean book keys."""
+    payload = _load_local_gae_payload()
+    book = next((item for item in BOOKS if item.bskorea_code == book_code), None)
+    lookup_keys: list[str] = [book_code, book_code.lower()]
+    if book:
+        lookup_keys = [book.aliases[0], *book.aliases, book.bskorea_code]
+
+    book_payload = None
+    for key in lookup_keys:
+        value = payload.get(key)
+        if isinstance(value, dict):
+            book_payload = value
+            break
+    if book_payload is None:
+        raise KeyError(f"Book not in local GAE file: {book_code}")
+
+    chapter_key = str(scripture_range.chapter)
+    chapter_payload = book_payload.get(chapter_key)
+    if not isinstance(chapter_payload, dict):
+        raise KeyError(f"Chapter not in local GAE file: {book_code} {chapter_key}")
+
+    verses: dict[int, str] = {}
+    for verse_num in scripture_range.verse_numbers():
+        text = chapter_payload.get(str(verse_num), chapter_payload.get(verse_num))
+        if text:
+            verses[verse_num] = _normalize_spaces(str(text))
+    return verses
+
+
+def _parse_holybible_gae_verses(html: str) -> dict[int, str]:
+    """Parse holybible GAE chapter HTML into verse_num -> plain text."""
+    starts = list(_OL_START_PATTERN.finditer(html))
+    verses: dict[int, str] = {}
+    for index, match in enumerate(starts):
+        start_num = int(match.group(1))
+        section_end = starts[index + 1].start() if index + 1 < len(starts) else len(html)
+        section = html[match.end() : section_end]
+        for offset, li_match in enumerate(_LI_VERSE_PATTERN.finditer(section)):
+            text = _clean_holybible_text(li_match.group(1))
+            if text:
+                verses[start_num + offset] = text
+    return verses
+
+
+def _clean_holybible_text(fragment: str) -> str:
+    """Strip dictionary links/tags; keep link inner text for natural spacing."""
+    text = re.sub(r"<a\b[^>]*>(.*?)</a>", r"\1", fragment, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<br\s*/?>", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = text.replace("&nbsp;", " ")
+    return _normalize_spaces(text)
 
 
 def fetch_english_verses(reference_en: str, scripture_range: ScriptureRange) -> dict[int, str]:

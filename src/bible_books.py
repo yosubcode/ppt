@@ -23,7 +23,7 @@ BOOKS: tuple[BibleBook, ...] = (
     BibleBook("Numbers", "num", ("민", "민수", "민수기")),
     BibleBook("Deuteronomy", "deu", ("신", "신명", "신명기")),
     BibleBook("Joshua", "jos", ("수", "여호", "여호수아")),
-    BibleBook("Judges", "jud", ("삿", "판관", "사사", "사사기")),
+    BibleBook("Judges", "jdg", ("삿", "판관", "사사", "사사기")),
     BibleBook("Ruth", "rut", ("룻", "룻기")),
     BibleBook("1 Samuel", "1sa", ("삼상", "사무엘상")),
     BibleBook("2 Samuel", "2sa", ("삼하", "사무엘하")),
@@ -48,7 +48,7 @@ BOOKS: tuple[BibleBook, ...] = (
     BibleBook("Joel", "jol", ("욜", "요엘")),
     BibleBook("Amos", "amo", ("암", "아모", "아모스")),
     BibleBook("Obadiah", "oba", ("옵", "오바", "오바댜")),
-    BibleBook("Jonah", "jon", ("욘", "요나")),
+    BibleBook("Jonah", "jnh", ("욘", "요나")),
     BibleBook("Micah", "mic", ("미", "미가")),
     BibleBook("Nahum", "nam", ("나", "나훔")),
     BibleBook("Habakkuk", "hab", ("합", "하박", "하박국")),
@@ -81,7 +81,7 @@ BOOKS: tuple[BibleBook, ...] = (
     BibleBook("1 John", "1jn", ("요일", "요한1서", "요한일서")),
     BibleBook("2 John", "2jn", ("요이", "요한2서", "요한이서")),
     BibleBook("3 John", "3jn", ("요삼", "요한3서", "요한삼서")),
-    BibleBook("Jude", "jde", ("유", "유다", "유다서")),
+    BibleBook("Jude", "jud", ("유", "유다", "유다서")),
     BibleBook("Revelation", "rev", ("계", "요계", "요한계시록", "계시록")),
 )
 

@@ -73,6 +73,7 @@ def ensure_app_dirs() -> None:
         "hymns",
         "templates",
         "responsive_readings",
+        "bible",
     ):
         (root / name).mkdir(parents=True, exist_ok=True)
 
@@ -87,6 +88,29 @@ def ensure_app_dirs() -> None:
         bundled_thumbnail = get_bundle_root() / "templates" / "Thumbnail_Template.pptx"
         if bundled_thumbnail.exists():
             shutil.copy2(bundled_thumbnail, local_thumbnail)
+
+    local_gae = root / "bible" / "gae_verses.json"
+    if not local_gae.exists():
+        bundled_gae = get_bundle_root() / "bible" / "gae_verses.json"
+        if bundled_gae.exists():
+            shutil.copy2(bundled_gae, local_gae)
+
+
+def get_gae_verses_path() -> Path | None:
+    """Prefer bible/gae_verses.json next to the app, then the bundled copy."""
+    local = get_app_root() / "bible" / "gae_verses.json"
+    if local.is_file():
+        return local
+
+    bundled = get_bundle_root() / "bible" / "gae_verses.json"
+    if bundled.is_file():
+        return bundled
+
+    legacy = get_app_root() / "data" / "gae_verses.json"
+    if legacy.is_file():
+        return legacy
+
+    return None
 
 
 def get_input_hyms_dir() -> Path:

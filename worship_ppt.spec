@@ -10,6 +10,7 @@ SRC = ROOT / "src"
 datas = [
     (str(ROOT / "templates" / "Sunday_Template.pptx"), "templates"),
     (str(ROOT / "templates" / "Thumbnail_Template.pptx"), "templates"),
+    (str(ROOT / "bible" / "gae_verses.json"), "bible"),
 ]
 binaries = []
 hiddenimports = [
@@ -17,6 +18,7 @@ hiddenimports = [
     "dotenv",
     "deep_translator",
     "deep_translator.google",
+    "deep_translator.mymemory",
     "fitz",
     "gui_app",
     "kiwipiepy",
