@@ -15,7 +15,7 @@
 
 | 기능 | 상태 | 비고 |
 |------|------|------|
-| GUI (`WorshipPPT.exe`) | ✅ | PDF 불러오기, 필드 수정, PPT 생성 |
+| GUI (`PPT.exe`) | ✅ | PDF 불러오기, 필드 수정, PPT 생성 |
 | 주보 PDF 자동 분석 | ✅ | 11am 왼쪽 열만 사용 |
 | 설교 PDF 자동 분석 | ✅ | 제목, 3부, 성경 구절 |
 | 템플릿 플레이스홀더 치환 | ✅ | `ppt_builder.py` (python-pptx) |
@@ -52,10 +52,10 @@
 PPT/
 ├── PLAN.md
 ├── requirements.txt
-├── worship_ppt.spec              # PyInstaller 설정
+├── ppt.spec              # PyInstaller 설정
 ├── build_exe.bat                 # exe 빌드
 ├── run_gui.bat                   # exe 또는 python GUI 실행
-├── WorshipPPT.exe                # 빌드 결과 (gitignore)
+├── PPT.exe                # 빌드 결과 (gitignore)
 ├── .gitignore
 │
 ├── config/
@@ -153,7 +153,7 @@ OPENAI_MODEL=gpt-4.1-mini
 | `OPENAI_MODEL` | OpenAI 모델 (선택) |
 
 - `ESV_API_KEY` 없으면 영어 성경은 bible-api.com **WEB** fallback
-- exe 사용 시: `WorshipPPT.exe` 옆 `config/.env`에 동일하게 배치
+- exe 사용 시: `PPT.exe` 옆 `config/.env`에 동일하게 배치
 - 앱 시작 시 `app_paths.load_app_env()`로 자동 로드
 
 ### 4.3 GUI (권장)
@@ -162,7 +162,7 @@ OPENAI_MODEL=gpt-4.1-mini
 
 **2.** (선택) `input_hyms/`에 찬송 배경 이미지 넣기
 
-**3.** `WorshipPPT.exe` 실행 (또는 `run_gui.bat` / `python scripts/run_gui.py`)
+**3.** `PPT.exe` 실행 (또는 `run_gui.bat` / `python scripts/run_gui.py`)
 
 - `input/` + `input2/` 둘 다 PDF 있으면 시작 시 자동 불러오기
 - 왼쪽: 교독문·성경 본문(KO/EN) 붙여넣기/수정
@@ -185,7 +185,7 @@ config/extracted_week.json
 또는:
 
 ```powershell
-python -m PyInstaller worship_ppt.spec --distpath . --workpath build\pyinstaller --clean -y
+python -m PyInstaller ppt.spec --distpath . --workpath build\pyinstaller --clean -y
 ```
 
 코드 수정 후 exe에 반영하려면 **반드시 재빌드** 필요.
@@ -689,7 +689,7 @@ config/extracted_week.json 저장
 | 찬송 뒤에 교회 PPT 배경 보임 | 배경 이미지 선택 또는 흰 배경 자동 적용 확인 |
 | **34–36 bg가 엉뚱한 슬라이드에** | **코드 순서 확인**: 치환 직후 34–36 적용 여부 (`week_generator.py`) |
 | **최종 PPT 34–36번에 bg 없음** | **정상**: 번호가 밀림. bg는 원래 34–36 슬라이드가 이동한 위치에 있음 |
-| WorshipPPT.exe 시작 즉시 종료 | `kiwipiepy_model` 번들 + `config/error.log` 확인 |
+| PPT.exe 시작 즉시 종료 | `kiwipiepy_model` 번들 + `config/error.log` 확인 |
 | API 키 안 읽힘 | exe 옆 `config/.env`, 앱 재시작 |
 
 ---
@@ -714,7 +714,7 @@ config/extracted_week.json 저장
   - 삽입 찬송 슬라이드: 70%
   - 34–36: 70% (아래 19.4에서 순서 수정)
 - **테스트:** `scripts/test_hymn_background.py`, `scripts/test_hymn_background_integration.py`
-- **exe:** WorshipPPT.exe 재빌드 반영
+- **exe:** PPT.exe 재빌드 반영
 
 ### 19.3 고정 배경 34–36 적용 순서 수정 (버그 fix)
 
@@ -769,14 +769,14 @@ config/extracted_week.json 저장
 
 - **추가/수정:** `.gitignore`
   - `config/.env`, `config/extracted_week.json`
-  - `output/*`, `WorshipPPT.exe`, `build/`
+  - `output/*`, `PPT.exe`, `build/`
   - 루트 `*.pptx` (templates 제외)
 - **삭제:** 불필요 build artifact, dev-only 검증 JSON 등 (대화 중 정리)
 
 ### 19.11 GUI / exe 관련 (대화 중 누적)
 
 - Tkinter GUI (`gui_app.py`, `week_generator.py` 공통 로직)
-- PyInstaller `WorshipPPT.exe` (~160MB)
+- PyInstaller `PPT.exe` (~160MB)
 - `kiwipiepy_model` exe 번들 (크래시 fix)
 - PDF 찾기/불러오기 분리, 백그라운드 파싱, 창 크기 고정
 - 성경 본문 bulk KO/EN 붙여넣기 + 자동 절 분리
@@ -810,5 +810,5 @@ git commit -m "Apply hymn background to slides 34-36 before responsive, scriptur
 
 ## 20. 한 줄 요약
 
-> **PDF 넣기 → WorshipPPT.exe → [찬송 bg 선택] → [PPT 생성] → 완성**  
+> **PDF 넣기 → PPT.exe → [찬송 bg 선택] → [PPT 생성] → 완성**  
 > 주보/설교 추출 + 성경 fetch + 영문 번역 + **34–36 bg 먼저** + 교독문/성경/찬송 COM + embed fonts + 썸네일까지 자동.

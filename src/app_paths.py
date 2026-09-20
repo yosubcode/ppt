@@ -72,7 +72,6 @@ def ensure_app_dirs() -> None:
         "config",
         "hymns",
         "templates",
-        "responsive_readings",
         "bible",
     ):
         (root / name).mkdir(parents=True, exist_ok=True)
@@ -95,6 +94,14 @@ def ensure_app_dirs() -> None:
         if bundled_gae.exists():
             shutil.copy2(bundled_gae, local_gae)
 
+    for name in ("responsive_ko.json", "responsive_en.json"):
+        local_path = root / "bible" / name
+        if local_path.exists():
+            continue
+        bundled_path = get_bundle_root() / "bible" / name
+        if bundled_path.exists():
+            shutil.copy2(bundled_path, local_path)
+
 
 def get_gae_verses_path() -> Path | None:
     """Prefer bible/gae_verses.json next to the app, then the bundled copy."""
@@ -111,6 +118,24 @@ def get_gae_verses_path() -> Path | None:
         return legacy
 
     return None
+
+
+def _resolve_bible_json(filename: str) -> Path | None:
+    local = get_app_root() / "bible" / filename
+    if local.is_file():
+        return local
+    bundled = get_bundle_root() / "bible" / filename
+    if bundled.is_file():
+        return bundled
+    return None
+
+
+def get_responsive_ko_path() -> Path | None:
+    return _resolve_bible_json("responsive_ko.json")
+
+
+def get_responsive_en_path() -> Path | None:
+    return _resolve_bible_json("responsive_en.json")
 
 
 def get_input_hyms_dir() -> Path:

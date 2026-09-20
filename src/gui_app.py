@@ -35,7 +35,7 @@ SERMON_VERSE_FIELDS: tuple[str, ...] = tuple(
 )
 
 
-class WorshipPptApp(tk.Tk):
+class PptApp(tk.Tk):
     """Simple GUI: load PDFs, review fields, generate PPT."""
 
     def __init__(self) -> None:
@@ -850,7 +850,7 @@ def main() -> None:
         root.destroy()
         raise SystemExit(1)
 
-    app = WorshipPptApp()
+    app = PptApp()
     app.mainloop()
 
 

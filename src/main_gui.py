@@ -24,7 +24,7 @@ def _report_fatal_error(error: BaseException) -> None:
         root = tk.Tk()
         root.withdraw()
         messagebox.showerror(
-            "WorshipPPT 오류",
+            "PPT 오류",
             f"프로그램 시작 중 오류가 발생했습니다.\n\n{error}\n\n"
             f"자세한 내용: {log_path}",
         )

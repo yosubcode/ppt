@@ -14,6 +14,10 @@ config/extracted_week.json
 config/*.log
 output/*
 !output/.gitkeep
+bible/responsive_translate_log.txt
+bible/scrape_log.txt
+bible/scrape_failures.json
+bible/full_audit_report.txt
 
 # Removed / unused feature folders
 input3/
@@ -22,6 +26,7 @@ tools/
 dist/
 
 # Built executable (rebuild with build_exe.bat)
+PPT.exe
 WorshipPPT.exe
 AutoPPT.exe
 

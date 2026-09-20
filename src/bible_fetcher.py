@@ -20,7 +20,7 @@ from bible_books import (
 from scripture_parser import ScriptureRange, apply_scripture_range_to_data, parse_scripture_range
 from sermon_verse_parser import build_sermon_part_ko_en, format_part_verse_ref_en
 
-USER_AGENT = "Mozilla/5.0 (WorshipPPT/1.0)"
+USER_AGENT = "Mozilla/5.0 (PPT/1.0)"
 BSKOREA_URL = "https://www.bskorea.or.kr/bible/korbibReadpage.php"
 HOLYBIBLE_GAE_URL = "http://www.holybible.or.kr/B_GAE/cgi/bibleftxt.php"
 BIBLE_API_URL = "https://bible-api.com"

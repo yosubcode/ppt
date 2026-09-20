@@ -11,6 +11,8 @@ datas = [
     (str(ROOT / "templates" / "Sunday_Template.pptx"), "templates"),
     (str(ROOT / "templates" / "Thumbnail_Template.pptx"), "templates"),
     (str(ROOT / "bible" / "gae_verses.json"), "bible"),
+    (str(ROOT / "bible" / "responsive_ko.json"), "bible"),
+    (str(ROOT / "bible" / "responsive_en.json"), "bible"),
 ]
 binaries = []
 hiddenimports = [
@@ -80,7 +82,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name="WorshipPPT",
+    name="PPT",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

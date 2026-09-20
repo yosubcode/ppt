@@ -47,7 +47,7 @@ def build_responsive_lines(
                 continue
             ko = strip_responsive_scripture_references(str(item.get("ko", "")).strip())
             en = str(item.get("en", "")).strip()
-            if not translate and en:
+            if en:
                 en = strip_responsive_scripture_references(en)
             if ko or en:
                 lines.append({"ko": ko, "en": en})
@@ -60,13 +60,19 @@ def build_responsive_lines(
         return []
 
     en_lines: list[str] = []
-    if translate:
+    local_en = [
+        strip_responsive_scripture_references(str(item).strip())
+        for item in (data.get("responsive_en_lines") or [])
+    ]
+    local_en = [line for line in local_en if line]
+
+    # Prefer prebuilt local English so PPT generation does not re-translate.
+    if len(local_en) == len(ko_lines):
+        en_lines = local_en
+    elif translate:
         en_lines = translate_responsive_lines_esv(ko_lines)
-    elif isinstance(data.get("responsive_en_lines"), list):
-        en_lines = [
-            strip_responsive_scripture_references(str(item).strip())
-            for item in data["responsive_en_lines"]
-        ]
+    elif local_en:
+        en_lines = local_en
 
     result: list[dict[str, str]] = []
     for index, ko in enumerate(ko_lines):
