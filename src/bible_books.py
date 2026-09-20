@@ -123,6 +123,16 @@ def format_scripture_reference_ko(scripture: str) -> str:
     return re.sub(r"\s+", "", cleaned)
 
 
+def format_scripture_chapter_verse(scripture: str) -> str | None:
+    """Return chapter:verse only, e.g. '4:22-29'."""
+    parsed = parse_scripture_range(scripture)
+    if not parsed:
+        return None
+    if parsed.start == parsed.end:
+        return f"{parsed.chapter}:{parsed.start}"
+    return f"{parsed.chapter}:{parsed.start}-{parsed.end}"
+
+
 def format_scripture_reference_ko_full(scripture: str) -> str:
     """Convert '수17:15-30' to '여호수아 17:15-30'."""
     cleaned = format_scripture_reference_ko(scripture)
@@ -141,14 +151,29 @@ def format_scripture_reference_ko_full(scripture: str) -> str:
     else:
         book_name = ""
 
-    if parsed.start == parsed.end:
-        reference = f"{parsed.chapter}:{parsed.start}"
-    else:
-        reference = f"{parsed.chapter}:{parsed.start}-{parsed.end}"
+    reference = format_scripture_chapter_verse(cleaned)
+    if not reference:
+        return cleaned
 
     if book_name:
         return f"{book_name} {reference}"
     return reference
+
+
+def format_scripture_slide_book_label(scripture: str) -> str:
+    """Return slide title line like '요한복음 (John)'."""
+    cleaned = format_scripture_reference_ko(scripture)
+    if not cleaned:
+        return ""
+
+    parsed = parse_scripture_range(cleaned)
+    book = resolve_bible_book(cleaned, parsed)
+    if book:
+        return f"{get_korean_book_full_name(book)} ({book.english_name})"
+
+    if parsed and parsed.book:
+        return parsed.book
+    return cleaned
 
 
 def format_scripture_reference_en(scripture: str) -> str | None:
@@ -161,6 +186,7 @@ def format_scripture_reference_en(scripture: str) -> str | None:
     if not book:
         return None
 
-    if parsed.start == parsed.end:
-        return f"{book.english_name} {parsed.chapter}:{parsed.start}"
-    return f"{book.english_name} {parsed.chapter}:{parsed.start}-{parsed.end}"
+    reference = format_scripture_chapter_verse(scripture)
+    if not reference:
+        return None
+    return f"{book.english_name} {reference}"

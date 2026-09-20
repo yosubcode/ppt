@@ -8,10 +8,16 @@ from typing import Any, Iterable
 
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.oxml.ns import qn
+from pptx.oxml.xmlchemy import OxmlElement
 from pptx.shapes.base import BaseShape
 from pptx.text.text import _Paragraph, _Run
 from translator import fill_english_fields
-from bible_books import format_scripture_reference_en, format_scripture_reference_ko_full
+from bible_books import (
+    format_scripture_chapter_verse,
+    format_scripture_reference_en,
+    format_scripture_slide_book_label,
+)
 
 TOKEN_PATTERN = re.compile(r"\{\{[A-Z0-9_]+\}\}")
 
@@ -26,8 +32,8 @@ PLACEHOLDER_MAP: dict[str, str] = {
     "hymn1": "{{HYMN1}}",
     "hymn2": "{{HYMN2}}",
     "scripture_reference": "{{SCRIPTURE_REFERENCE}}",
-    "scripture_ko": "{{SCRIPTURE_KO}}",
-    "scripture_en": "{{SCRIPTURE_EN}}",
+    "scripture_ko_en": "{{SCRIPTURE_KO_EN}}",
+    "scripture_verse": "{{SCRIPTURE_VERSE}}",
     "sermon_title2": "{{SERMON_TITLE2}}",
     "sermon_title": "{{SERMON_TITLE}}",
     "sermon_title_eng": "{{SERMON_TITLE_ENG}}",
@@ -79,12 +85,15 @@ def build_replacements(data: dict[str, Any]) -> dict[str, str]:
         reference_en = format_scripture_reference_en(str(normalized["scripture"]))
         if reference_en:
             normalized["scripture_reference"] = reference_en
-    if not normalized.get("scripture_ko") and normalized.get("scripture"):
-        normalized["scripture_ko"] = format_scripture_reference_ko_full(str(normalized["scripture"]))
-    if not normalized.get("scripture_en") and normalized.get("scripture"):
-        reference_en = format_scripture_reference_en(str(normalized["scripture"]))
-        if reference_en:
-            normalized["scripture_en"] = reference_en
+    if not normalized.get("scripture_ko_en") and normalized.get("scripture"):
+        normalized["scripture_ko_en"] = format_scripture_slide_book_label(
+            str(normalized["scripture"])
+        )
+    if not normalized.get("scripture_verse") and normalized.get("scripture"):
+        chapter_verse = format_scripture_chapter_verse(str(normalized["scripture"]))
+        if chapter_verse:
+            normalized["scripture_verse"] = chapter_verse
+
 
     replacements: dict[str, str] = {}
 
@@ -127,16 +136,54 @@ def _replace_in_paragraph(paragraph: _Paragraph, replacements: dict[str, str]) -
             changed = True
 
     remaining = paragraph.text
-    for token in replacements:
-        if token in remaining:
-            updated = remaining
-            for replace_token, value in replacements.items():
-                if replace_token in updated:
-                    updated = updated.replace(replace_token, value)
-            _set_paragraph_text_preserve_first_run(paragraph, updated)
-            return True
+    needs_cross_run = any(token in remaining for token in replacements)
+    if not needs_cross_run:
+        return changed
 
-    return changed
+    updated = remaining
+    for replace_token, value in replacements.items():
+        if replace_token in updated:
+            updated = updated.replace(replace_token, value)
+
+    if updated == remaining:
+        return changed
+
+    if "\x0b" in remaining:
+        _set_paragraph_lines_preserve_breaks(paragraph, updated)
+    else:
+        _set_paragraph_text_preserve_first_run(paragraph, updated)
+    return True
+
+
+def _set_run_element_text(run_element, text: str) -> None:
+    """Set <a:t> text on a DrawingML run element."""
+    text_elem = run_element.find(qn("a:t"))
+    if text_elem is None:
+        text_elem = OxmlElement("a:t")
+        run_element.append(text_elem)
+    text_elem.text = text
+
+
+def _set_paragraph_lines_preserve_breaks(paragraph: _Paragraph, text: str) -> None:
+    """Assign lines split by soft breaks without destroying <a:br/> elements."""
+    lines = text.split("\x0b")
+    groups: list[list] = [[]]
+    for child in paragraph._p:
+        if child.tag == qn("a:br"):
+            groups.append([])
+        elif child.tag == qn("a:r"):
+            groups[-1].append(child)
+
+    for index, line in enumerate(lines):
+        if index >= len(groups) or not groups[index]:
+            continue
+        _set_run_element_text(groups[index][0], line)
+        for run_element in groups[index][1:]:
+            _set_run_element_text(run_element, "")
+
+    for extra_group in groups[len(lines) :]:
+        for run_element in extra_group:
+            _set_run_element_text(run_element, "")
 
 
 def _set_paragraph_text_preserve_first_run(paragraph: _Paragraph, text: str) -> None:

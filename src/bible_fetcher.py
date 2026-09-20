@@ -12,8 +12,9 @@ from typing import Any
 
 from bible_books import (
     BOOKS,
+    format_scripture_chapter_verse,
     format_scripture_reference_en,
-    format_scripture_reference_ko_full,
+    format_scripture_slide_book_label,
     resolve_bible_book,
 )
 from scripture_parser import ScriptureRange, apply_scripture_range_to_data, parse_scripture_range
@@ -49,12 +50,16 @@ def enrich_scripture_data(data: dict[str, Any], *, fetch: bool = True) -> dict[s
     if not scripture:
         return updated
 
-    reference_ko = format_scripture_reference_ko_full(scripture)
+    # Slide labels: "요한복음 (John)" / "4:22-29" (avoid repeating book+range).
+    # Keep full English reference for verse APIs and {{SCRIPTURE_REFERENCE}}.
     reference_en = format_scripture_reference_en(scripture)
-    updated["scripture_ko"] = reference_ko
+    updated["scripture_ko_en"] = format_scripture_slide_book_label(scripture)
+    chapter_verse = format_scripture_chapter_verse(scripture)
+    if chapter_verse:
+        updated["scripture_verse"] = chapter_verse
     if reference_en:
-        updated["scripture_en"] = reference_en
         updated["scripture_reference"] = reference_en
+
 
     has_manual_text = bool(
         str(updated.get("scripture_ko_text", "")).strip()

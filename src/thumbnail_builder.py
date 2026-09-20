@@ -100,7 +100,8 @@ def build_thumbnail_replacements(data: dict[str, Any]) -> dict[str, str]:
     if sermon_title:
         replacements[THUMBNAIL_PLACEHOLDER_MAP["sermon_title"]] = sermon_title
 
-    scripture = str(normalized.get("scripture_ko") or normalized.get("scripture") or "").strip()
+    # Prefer raw bulletin reference; scripture_ko is a slide display label.
+    scripture = str(normalized.get("scripture") or normalized.get("scripture_ko") or "").strip()
     if scripture:
         replacements[THUMBNAIL_PLACEHOLDER_MAP["scripture_ko"]] = format_thumbnail_scripture_ko(
             scripture
