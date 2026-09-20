@@ -188,7 +188,7 @@ def generate_week_ppt(
     if not opts.template.exists():
         raise FileNotFoundError(
             f"Template not found: {opts.template}. "
-            "Run: python scripts/create_sample_template.py"
+            "Add templates/Sunday_Template.pptx next to the app."
         )
 
     if opts.generate_thumbnail and not opts.thumbnail_template.exists():
