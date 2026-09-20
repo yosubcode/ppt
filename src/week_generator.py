@@ -184,6 +184,8 @@ def generate_week_ppt(
 ) -> GenerateResult:
     """Validate data, replace placeholders, optionally insert hymns."""
     opts = options or GenerateOptions()
+    # Always load local responsive EN/KO JSON before slide insert / translate.
+    data = enrich_responsive_data(dict(data))
 
     if not opts.template.exists():
         raise FileNotFoundError(

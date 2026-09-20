@@ -657,6 +657,10 @@ class PptApp(tk.Tk):
         if responsive_ko_text:
             data["responsive_ko_text"] = responsive_ko_text
 
+        from responsive_library import enrich_responsive_data
+
+        data = enrich_responsive_data(data)
+
         from scripture_parser import build_scripture_verses
 
         verses = build_scripture_verses(data)
